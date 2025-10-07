@@ -221,8 +221,20 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
         println("DEBUG REPO: sourceIcon='${sourceIcon?.label}' (protected=${sourceIcon?.isProtected})")
         println("DEBUG REPO: targetIcon='${targetIcon?.label}' (protected=${targetIcon?.isProtected})")
         
-        if (sourceIcon == null || sourceIcon.isProtected) {
-            println("DEBUG REPO: Blocked - sourceIcon is null or protected")
+        if (sourceIcon == null) {
+            println("DEBUG REPO: Blocked - sourceIcon is null")
+            return
+        }
+        
+        // BLOCK protected icons - they cannot be moved or swapped at all
+        if (sourceIcon.isProtected) {
+            println("DEBUG REPO: 🔒 BLOCKED - sourceIcon '${sourceIcon.label}' is protected")
+            return
+        }
+        
+        // BLOCK dropping on protected icons - they cannot be replaced
+        if (targetIcon?.isProtected == true) {
+            println("DEBUG REPO: 🔒 BLOCKED - targetIcon '${targetIcon.label}' is protected")
             return
         }
         
@@ -257,11 +269,24 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
         }
         
         println("DEBUG REPO: Updating state with isModified=true")
-        _state.value = currentState.copy(
+        val newState = currentState.copy(
             configuration = newConfig,
             isModified = true
         )
+        _state.value = newState
+        
+        // Verify the update happened
+        val verifyState = _state.value
         println("DEBUG REPO: State updated successfully")
+        println("DEBUG REPO: Verification - state after update:")
+        when {
+            source == DragSource.LEFT_SIDE_MENU && target == DragTarget.LEFT_SIDE_MENU -> {
+                println("DEBUG REPO: Left menu [$sourceIndex]='${verifyState.configuration.leftSideMenu[sourceIndex]?.label}', [$targetIndex]='${verifyState.configuration.leftSideMenu[targetIndex]?.label}'")
+            }
+            source == DragSource.RIGHT_SIDE_MENU && target == DragTarget.RIGHT_SIDE_MENU -> {
+                println("DEBUG REPO: Right menu [$sourceIndex]='${verifyState.configuration.rightSideMenu[sourceIndex]?.label}', [$targetIndex]='${verifyState.configuration.rightSideMenu[targetIndex]?.label}'")
+            }
+        }
     }
     
     override fun saveConfiguration() {
