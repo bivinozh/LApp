@@ -390,10 +390,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startDragFromMiddleTray(position: Int) {
+        println("DEBUG DRAG: ========== START DRAG FROM MIDDLE TRAY ==========")
+        println("DEBUG DRAG: Position = $position")
+        
         val state = viewModel.state.value
         val icon = state.configuration.middleTray[position]
-        if (icon != null && icon.isEnabled && !icon.isProtected) {
+        println("DEBUG DRAG: Icon at position $position = '${icon?.label}', enabled=${icon?.isEnabled}, protected=${icon?.isProtected}")
+        
+        if (icon != null && !icon.isEnabled) {
+            println("DEBUG DRAG: 🔒 BLOCKED - Icon '${icon.label}' is disabled (exists in side tray)")
+            return
+        }
+        
+        if (icon != null && icon.isProtected) {
+            println("DEBUG DRAG: 🔒 BLOCKED - Icon '${icon.label}' is protected")
+            return
+        }
+        
+        if (icon != null && icon.isEnabled) {
+            println("DEBUG DRAG: ✅ Starting drag for '${icon.label}'")
             startDrag(icon, DragSource.MIDDLE_TRAY, position)
+        } else {
+            println("DEBUG DRAG: ❌ Cannot drag - icon is null")
         }
     }
 

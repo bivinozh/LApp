@@ -33,9 +33,17 @@ class MiddleTrayAdapter(
         if (icon != null) {
             holder.iconImageView.setImageResource(icon.iconRes)
             holder.labelTextView.text = icon.label
-            holder.iconImageView.alpha = if (icon.isEnabled) 1.0f else 0.4f
-            holder.labelTextView.alpha = if (icon.isEnabled) 1.0f else 0.4f
+            // Disabled icons (in side tray) show at 40% opacity and are not clickable
+            holder.iconImageView.alpha = if (icon.isEnabled) 1.0f else 0.3f
+            holder.labelTextView.alpha = if (icon.isEnabled) 1.0f else 0.3f
             holder.itemView.isEnabled = icon.isEnabled && !icon.isProtected
+            
+            // Visual indicator for disabled state
+            if (!icon.isEnabled) {
+                holder.itemView.alpha = 0.5f
+            } else {
+                holder.itemView.alpha = 1.0f
+            }
         } else {
             holder.iconImageView.setImageDrawable(null)
             holder.labelTextView.text = ""
@@ -50,9 +58,15 @@ class MiddleTrayAdapter(
 
         holder.itemView.setOnLongClickListener {
             if (icon != null && icon.isEnabled && !icon.isProtected) {
+                println("DEBUG MIDDLE TRAY: Long click at position $position for icon '${icon.label}' (enabled=${icon.isEnabled})")
                 onItemLongClick(position)
                 true
             } else {
+                if (icon?.isEnabled == false) {
+                    println("DEBUG MIDDLE TRAY: 🔒 Long click blocked - '${icon.label}' is disabled (exists in side tray)")
+                } else if (icon?.isProtected == true) {
+                    println("DEBUG MIDDLE TRAY: 🔒 Long click blocked - '${icon.label}' is protected")
+                }
                 false
             }
         }

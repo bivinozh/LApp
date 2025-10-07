@@ -117,21 +117,28 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
         toIndex: Int,
         draggedIcon: IconItem
     ) {
+        println("DEBUG REPO: handleSideLauncherToMiddleTrayMove - enabling icon '${draggedIcon.label}' in middle tray")
+        
         val currentState = _state.value
         
-        // Get the icon being replaced in middle tray
-        val replacedIcon = config.middleTray[toIndex]
-        
-        // Update middle tray with dragged icon (enabled)
+        // Find the same icon in middle tray by ID and enable it
         val newMiddleTray = config.middleTray.toMutableList()
-        newMiddleTray[toIndex] = draggedIcon.copy(isEnabled = true)
+        val middleTrayIndex = newMiddleTray.indexOfFirst { it?.id == draggedIcon.id }
         
-        // Update source side launcher
+        if (middleTrayIndex != -1) {
+            println("DEBUG REPO: Found '${draggedIcon.label}' at middle tray position $middleTrayIndex - enabling it")
+            newMiddleTray[middleTrayIndex] = draggedIcon.copy(isEnabled = true)
+        } else {
+            println("DEBUG REPO: Icon '${draggedIcon.label}' not found in middle tray - cannot enable")
+            return
+        }
+        
+        // Remove from source side launcher
         val updatedConfig = when (fromSource) {
             DragSource.LEFT_SIDE_MENU -> {
                 val newLeftMenu = config.leftSideMenu.toMutableList()
-                // Always remove the dragged icon from side launcher (set to null)
                 newLeftMenu[fromIndex] = null
+                println("DEBUG REPO: Removed from left menu position $fromIndex")
                 config.copy(
                     middleTray = newMiddleTray,
                     leftSideMenu = newLeftMenu
@@ -139,8 +146,8 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
             }
             DragSource.RIGHT_SIDE_MENU -> {
                 val newRightMenu = config.rightSideMenu.toMutableList()
-                // Always remove the dragged icon from side launcher (set to null)
                 newRightMenu[fromIndex] = null
+                println("DEBUG REPO: Removed from right menu position $fromIndex")
                 config.copy(
                     middleTray = newMiddleTray,
                     rightSideMenu = newRightMenu
@@ -163,6 +170,8 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
         toIndex: Int,
         draggedIcon: IconItem
     ) {
+        println("DEBUG REPO: handleMiddleTrayToSideLauncherMove - disabling '${draggedIcon.label}' in middle tray")
+        
         val currentState = _state.value
         
         // Get the icon being replaced in side launcher
@@ -172,30 +181,47 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
             else -> null
         }
         
+        println("DEBUG REPO: Replaced icon in side menu = '${replacedIcon?.label}'")
+        
+        // Disable the middle tray icon (keep it there but make it non-draggable)
+        val newMiddleTray = config.middleTray.toMutableList()
+        newMiddleTray[fromIndex] = draggedIcon.copy(isEnabled = false)
+        println("DEBUG REPO: Disabled '${draggedIcon.label}' at middle tray position $fromIndex")
+        
+        // If there was an icon being replaced, re-enable it in middle tray
+        if (replacedIcon != null && !replacedIcon.isProtected) {
+            val replacedIconMiddleIndex = newMiddleTray.indexOfFirst { it?.id == replacedIcon.id }
+            if (replacedIconMiddleIndex != -1) {
+                newMiddleTray[replacedIconMiddleIndex] = replacedIcon.copy(isEnabled = true)
+                println("DEBUG REPO: Re-enabled '${replacedIcon.label}' at middle tray position $replacedIconMiddleIndex")
+            }
+        }
+        
         // Update side launcher with dragged icon (enabled)
         val updatedConfig = when (toTarget) {
             DragTarget.LEFT_SIDE_MENU -> {
                 val newLeftMenu = config.leftSideMenu.toMutableList()
                 newLeftMenu[toIndex] = draggedIcon.copy(isEnabled = true)
-                config.copy(leftSideMenu = newLeftMenu)
+                println("DEBUG REPO: Placed '${draggedIcon.label}' in left menu position $toIndex")
+                config.copy(
+                    middleTray = newMiddleTray,
+                    leftSideMenu = newLeftMenu
+                )
             }
             DragTarget.RIGHT_SIDE_MENU -> {
                 val newRightMenu = config.rightSideMenu.toMutableList()
                 newRightMenu[toIndex] = draggedIcon.copy(isEnabled = true)
-                config.copy(rightSideMenu = newRightMenu)
+                println("DEBUG REPO: Placed '${draggedIcon.label}' in right menu position $toIndex")
+                config.copy(
+                    middleTray = newMiddleTray,
+                    rightSideMenu = newRightMenu
+                )
             }
             else -> config
         }
         
-        // Disable the middle tray position (not remove)
-        val finalConfig = updatedConfig.copy(
-            middleTray = updatedConfig.middleTray.toMutableList().apply { 
-                set(fromIndex, draggedIcon.copy(isEnabled = false)) 
-            }
-        )
-        
         _state.value = currentState.copy(
-            configuration = finalConfig,
+            configuration = updatedConfig,
             isModified = true
         )
     }
@@ -305,6 +331,28 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
         initializeDefaultConfiguration()
     }
     
+    private fun disableMiddleTrayIconsInSideMenus(config: LauncherConfiguration): LauncherConfiguration {
+        // Collect all non-protected icon IDs that exist in side menus
+        val sideMenuIconIds = mutableSetOf<String>()
+        config.leftSideMenu.forEach { icon -> 
+            icon?.let { if (!it.isProtected) sideMenuIconIds.add(it.id) } 
+        }
+        config.rightSideMenu.forEach { icon -> 
+            icon?.let { if (!it.isProtected) sideMenuIconIds.add(it.id) } 
+        }
+        
+        // Disable those icons in middle tray
+        val updatedMiddleTray = config.middleTray.map { icon ->
+            if (icon != null && sideMenuIconIds.contains(icon.id)) {
+                icon.copy(isEnabled = false)
+            } else {
+                icon
+            }
+        }
+        
+        return config.copy(middleTray = updatedMiddleTray)
+    }
+    
     private fun createDefaultConfiguration(): LauncherConfiguration {
         val protectedIcons = listOf(
             IconItem.createProtected("settings", "Settings", android.R.drawable.ic_menu_preferences),
@@ -327,12 +375,10 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
             IconItem.createCustomizable("app10", "App 10", android.R.drawable.ic_menu_gallery)
         )
         
-        // Place some icons in default positions
+        // Place all customizable icons in middle tray (all enabled initially)
         val middleTray = mutableListOf<IconItem?>()
-        middleTray.addAll(List(10) { null }) // 5x2 grid = 10 slots
-        // Add all customizable icons to middle tray
         customizableIcons.forEachIndexed { index, icon ->
-            middleTray[index] = icon // Fill all 10 slots
+            middleTray.add(icon.copy(isEnabled = true))
         }
         
         val leftSideMenu = mutableListOf<IconItem?>()
@@ -340,8 +386,8 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
         // Add protected icons and customizable icons to left side menu
         leftSideMenu[0] = protectedIcons[0] // Settings
         leftSideMenu[1] = protectedIcons[1] // LINK
-        leftSideMenu[2] = customizableIcons[0] // App 1 (same as center tray)
-        leftSideMenu[3] = customizableIcons[1] // App 2 (same as center tray)
+        leftSideMenu[2] = customizableIcons[0] // App 1
+        leftSideMenu[3] = customizableIcons[1] // App 2
         
         val rightSideMenu = mutableListOf<IconItem?>()
         rightSideMenu.addAll(List(4) { null }) // 4 items
@@ -349,13 +395,35 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
         rightSideMenu[0] = protectedIcons[2] // Phone
         rightSideMenu[1] = protectedIcons[3] // APPS
         rightSideMenu[2] = protectedIcons[4] // ALL MENU
-        rightSideMenu[3] = customizableIcons[2] // App 3 (same as center tray)
+        rightSideMenu[3] = customizableIcons[2] // App 3
+        
+        // Collect all icon IDs that exist in side menus
+        val sideMenuIconIds = mutableSetOf<String>()
+        leftSideMenu.forEach { icon -> icon?.let { if (!it.isProtected) sideMenuIconIds.add(it.id) } }
+        rightSideMenu.forEach { icon -> icon?.let { if (!it.isProtected) sideMenuIconIds.add(it.id) } }
+        
+        println("DEBUG REPO: Icons in side menus: $sideMenuIconIds")
+        
+        // Disable those icons in middle tray
+        val finalMiddleTray = middleTray.map { icon ->
+            if (icon != null && sideMenuIconIds.contains(icon.id)) {
+                println("DEBUG REPO: Disabling '${icon.label}' in middle tray (exists in side menu)")
+                icon.copy(isEnabled = false)
+            } else {
+                icon
+            }
+        }
+        
+        println("DEBUG REPO: Middle tray final state:")
+        finalMiddleTray.forEachIndexed { idx, icon ->
+            println("DEBUG REPO:   [$idx] '${icon?.label}' enabled=${icon?.isEnabled}")
+        }
         
         return LauncherConfiguration(
-            middleTray = middleTray,
+            middleTray = finalMiddleTray,
             leftSideMenu = leftSideMenu,
             rightSideMenu = rightSideMenu,
-            availableIcons = emptyList() // All icons are now placed
+            availableIcons = emptyList()
         )
     }
 }
