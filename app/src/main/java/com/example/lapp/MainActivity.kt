@@ -605,13 +605,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         okButton.setOnClickListener {
+            println("DEBUG BUTTON: OK button clicked - saving configuration")
+            val state = viewModel.state.value
+            println("DEBUG BUTTON: Current left menu: ${state.configuration.leftSideMenu.map { it?.label }}")
+            println("DEBUG BUTTON: Current right menu: ${state.configuration.rightSideMenu.map { it?.label }}")
+            
             viewModel.saveConfiguration()
-            finish()
+            
+            android.widget.Toast.makeText(this, "Configuration saved!", android.widget.Toast.LENGTH_SHORT).show()
+            println("DEBUG BUTTON: Configuration saved - app remains open")
         }
         
         cancelButton.setOnClickListener {
+            println("DEBUG BUTTON: Cancel button clicked - restoring previous configuration")
             viewModel.resetToDefault()
-            finish()
+            
+            android.widget.Toast.makeText(this, "Changes discarded", android.widget.Toast.LENGTH_SHORT).show()
+            println("DEBUG BUTTON: Changes discarded - app remains open")
         }
     }
 

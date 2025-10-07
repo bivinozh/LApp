@@ -6,10 +6,17 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.lapp.model.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
+import org.json.JSONObject
 
 interface LauncherRepository {
     val state: StateFlow<LauncherState>
@@ -28,8 +35,24 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
     private val _state = MutableStateFlow(LauncherState(LauncherConfiguration()))
     override val state: StateFlow<LauncherState> = _state
     
+    private var savedConfiguration: LauncherConfiguration? = null
+    private val scope = CoroutineScope(Dispatchers.IO)
+    
+    companion object {
+        private val KEY_LEFT_MENU = stringPreferencesKey("left_side_menu")
+        private val KEY_RIGHT_MENU = stringPreferencesKey("right_side_menu")
+        private val KEY_MIDDLE_TRAY = stringPreferencesKey("middle_tray")
+    }
+    
     override fun initializeDefaultConfiguration() {
         val defaultConfig = createDefaultConfiguration()
+        
+        // Save as the initial saved configuration if none exists
+        if (savedConfiguration == null) {
+            savedConfiguration = defaultConfig
+            println("DEBUG INIT: Set default configuration as initial saved state")
+        }
+        
         _state.value = _state.value.copy(
             configuration = defaultConfig,
             isModified = false
@@ -316,19 +339,92 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
     }
     
     override fun saveConfiguration() {
-        // Implementation would save to DataStore
-        // For now, just mark as not modified
-        _state.value = _state.value.copy(isModified = false)
+        println("DEBUG SAVE: Saving configuration to DataStore...")
+        val currentConfig = _state.value.configuration
+        
+        // Save the current configuration as the last saved state
+        savedConfiguration = currentConfig
+        
+        scope.launch {
+            try {
+                context.dataStore.edit { preferences ->
+                    // Serialize left menu
+                    preferences[KEY_LEFT_MENU] = serializeIconList(currentConfig.leftSideMenu)
+                    // Serialize right menu
+                    preferences[KEY_RIGHT_MENU] = serializeIconList(currentConfig.rightSideMenu)
+                    // Serialize middle tray
+                    preferences[KEY_MIDDLE_TRAY] = serializeIconList(currentConfig.middleTray)
+                    
+                    println("DEBUG SAVE: Configuration saved successfully")
+                    println("DEBUG SAVE: Left menu order: ${currentConfig.leftSideMenu.map { it?.label }}")
+                    println("DEBUG SAVE: Right menu order: ${currentConfig.rightSideMenu.map { it?.label }}")
+                }
+                
+                // Mark as not modified
+                _state.value = _state.value.copy(isModified = false)
+            } catch (e: Exception) {
+                println("DEBUG SAVE: Error saving configuration - ${e.message}")
+            }
+        }
     }
     
     override fun loadConfiguration() {
-        // Implementation would load from DataStore
-        // For now, initialize default
-        initializeDefaultConfiguration()
+        println("DEBUG LOAD: Loading configuration from DataStore...")
+        
+        runBlocking {
+            try {
+                val preferences = context.dataStore.data.first()
+                val leftMenuJson = preferences[KEY_LEFT_MENU]
+                val rightMenuJson = preferences[KEY_RIGHT_MENU]
+                val middleTrayJson = preferences[KEY_MIDDLE_TRAY]
+                
+                if (leftMenuJson != null && rightMenuJson != null && middleTrayJson != null) {
+                    val leftMenu = deserializeIconList(leftMenuJson)
+                    val rightMenu = deserializeIconList(rightMenuJson)
+                    val middleTray = deserializeIconList(middleTrayJson)
+                    
+                    val loadedConfig = LauncherConfiguration(
+                        middleTray = middleTray,
+                        leftSideMenu = leftMenu,
+                        rightSideMenu = rightMenu,
+                        availableIcons = emptyList()
+                    )
+                    
+                    savedConfiguration = loadedConfig
+                    _state.value = _state.value.copy(
+                        configuration = loadedConfig,
+                        isModified = false
+                    )
+                    
+                    println("DEBUG LOAD: Configuration loaded successfully")
+                    println("DEBUG LOAD: Left menu order: ${leftMenu.map { it?.label }}")
+                    println("DEBUG LOAD: Right menu order: ${rightMenu.map { it?.label }}")
+                } else {
+                    println("DEBUG LOAD: No saved configuration found - using default")
+                    initializeDefaultConfiguration()
+                }
+            } catch (e: Exception) {
+                println("DEBUG LOAD: Error loading configuration - ${e.message}")
+                initializeDefaultConfiguration()
+            }
+        }
     }
     
     override fun resetToDefault() {
-        initializeDefaultConfiguration()
+        println("DEBUG RESET: Resetting to last saved configuration or default")
+        
+        if (savedConfiguration != null) {
+            println("DEBUG RESET: Restoring saved configuration")
+            _state.value = _state.value.copy(
+                configuration = savedConfiguration!!,
+                isModified = false
+            )
+            println("DEBUG RESET: Left menu order: ${savedConfiguration!!.leftSideMenu.map { it?.label }}")
+            println("DEBUG RESET: Right menu order: ${savedConfiguration!!.rightSideMenu.map { it?.label }}")
+        } else {
+            println("DEBUG RESET: No saved configuration - using default")
+            initializeDefaultConfiguration()
+        }
     }
     
     private fun disableMiddleTrayIconsInSideMenus(config: LauncherConfiguration): LauncherConfiguration {
@@ -351,6 +447,48 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
         }
         
         return config.copy(middleTray = updatedMiddleTray)
+    }
+    
+    private fun serializeIconList(icons: List<IconItem?>): String {
+        val jsonArray = JSONArray()
+        icons.forEach { icon ->
+            if (icon != null) {
+                val jsonObject = JSONObject().apply {
+                    put("id", icon.id)
+                    put("label", icon.label)
+                    put("iconRes", icon.iconRes)
+                    put("isProtected", icon.isProtected)
+                    put("isEnabled", icon.isEnabled)
+                }
+                jsonArray.put(jsonObject)
+            } else {
+                jsonArray.put(JSONObject.NULL)
+            }
+        }
+        return jsonArray.toString()
+    }
+    
+    private fun deserializeIconList(json: String): List<IconItem?> {
+        val jsonArray = JSONArray(json)
+        val icons = mutableListOf<IconItem?>()
+        
+        for (i in 0 until jsonArray.length()) {
+            if (jsonArray.isNull(i)) {
+                icons.add(null)
+            } else {
+                val jsonObject = jsonArray.getJSONObject(i)
+                val icon = IconItem(
+                    id = jsonObject.getString("id"),
+                    label = jsonObject.getString("label"),
+                    iconRes = jsonObject.getInt("iconRes"),
+                    isProtected = jsonObject.getBoolean("isProtected"),
+                    isEnabled = jsonObject.getBoolean("isEnabled")
+                )
+                icons.add(icon)
+            }
+        }
+        
+        return icons
     }
     
     private fun createDefaultConfiguration(): LauncherConfiguration {
