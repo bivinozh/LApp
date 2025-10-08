@@ -1,22 +1,9 @@
 package com.example.lapp.repository
 
 import android.content.Context
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import com.example.lapp.model.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import org.json.JSONArray
-import org.json.JSONObject
 
 interface LauncherRepository {
     val state: StateFlow<LauncherState>
@@ -28,20 +15,25 @@ interface LauncherRepository {
     fun resetToDefault()
 }
 
-private val Context.dataStore by preferencesDataStore(name = "launcher_configuration")
-
-class LauncherRepositoryImpl(private val context: Context) : LauncherRepository {
+class LauncherRepositoryImpl private constructor(private val context: Context) : LauncherRepository {
     
     private val _state = MutableStateFlow(LauncherState(LauncherConfiguration()))
     override val state: StateFlow<LauncherState> = _state
     
     private var savedConfiguration: LauncherConfiguration? = null
-    private val scope = CoroutineScope(Dispatchers.IO)
     
     companion object {
-        private val KEY_LEFT_MENU = stringPreferencesKey("left_side_menu")
-        private val KEY_RIGHT_MENU = stringPreferencesKey("right_side_menu")
-        private val KEY_MIDDLE_TRAY = stringPreferencesKey("middle_tray")
+        @Volatile
+        private var INSTANCE: LauncherRepositoryImpl? = null
+        
+        fun getInstance(context: Context): LauncherRepositoryImpl {
+            return INSTANCE ?: synchronized(this) {
+                val instance = LauncherRepositoryImpl(context.applicationContext)
+                INSTANCE = instance
+                println("DEBUG SINGLETON: LauncherRepository instance created")
+                instance
+            }
+        }
     }
     
     override fun initializeDefaultConfiguration() {
@@ -366,74 +358,41 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
     }
     
     override fun saveConfiguration() {
-        println("DEBUG SAVE: Saving configuration to DataStore...")
+        println("DEBUG SAVE: Saving configuration to in-memory repository...")
         val currentConfig = _state.value.configuration
         
-        // Save the current configuration as the last saved state
-        savedConfiguration = currentConfig
+        // Save the current configuration as the last saved state (in-memory only)
+        savedConfiguration = currentConfig.copy(
+            middleTray = currentConfig.middleTray.toList(),
+            leftSideMenu = currentConfig.leftSideMenu.toList(),
+            rightSideMenu = currentConfig.rightSideMenu.toList()
+        )
         
-        scope.launch {
-            try {
-                context.dataStore.edit { preferences ->
-                    // Serialize left menu
-                    preferences[KEY_LEFT_MENU] = serializeIconList(currentConfig.leftSideMenu)
-                    // Serialize right menu
-                    preferences[KEY_RIGHT_MENU] = serializeIconList(currentConfig.rightSideMenu)
-                    // Serialize middle tray
-                    preferences[KEY_MIDDLE_TRAY] = serializeIconList(currentConfig.middleTray)
-                    
-                    println("DEBUG SAVE: Configuration saved successfully")
-                    println("DEBUG SAVE: Left menu order: ${currentConfig.leftSideMenu.map { it?.label }}")
-                    println("DEBUG SAVE: Right menu order: ${currentConfig.rightSideMenu.map { it?.label }}")
-                }
-                
-                // Mark as not modified
-                _state.value = _state.value.copy(isModified = false)
-            } catch (e: Exception) {
-                println("DEBUG SAVE: Error saving configuration - ${e.message}")
-            }
-        }
+        println("DEBUG SAVE: Configuration saved successfully to memory")
+        println("DEBUG SAVE: Left menu order: ${currentConfig.leftSideMenu.map { it?.label }}")
+        println("DEBUG SAVE: Right menu order: ${currentConfig.rightSideMenu.map { it?.label }}")
+        println("DEBUG SAVE: Middle tray enabled icons: ${currentConfig.middleTray.filter { it?.isEnabled == true }.map { it?.label }}")
+        
+        // Mark as not modified
+        _state.value = _state.value.copy(isModified = false)
     }
     
     override fun loadConfiguration() {
-        println("DEBUG LOAD: Loading configuration from DataStore...")
+        println("DEBUG LOAD: Loading configuration from repository...")
         
-        runBlocking {
-            try {
-                val preferences = context.dataStore.data.first()
-                val leftMenuJson = preferences[KEY_LEFT_MENU]
-                val rightMenuJson = preferences[KEY_RIGHT_MENU]
-                val middleTrayJson = preferences[KEY_MIDDLE_TRAY]
-                
-                if (leftMenuJson != null && rightMenuJson != null && middleTrayJson != null) {
-                    val leftMenu = deserializeIconList(leftMenuJson)
-                    val rightMenu = deserializeIconList(rightMenuJson)
-                    val middleTray = deserializeIconList(middleTrayJson)
-                    
-                    val loadedConfig = LauncherConfiguration(
-                        middleTray = middleTray,
-                        leftSideMenu = leftMenu,
-                        rightSideMenu = rightMenu,
-                        availableIcons = emptyList()
-                    )
-                    
-                    savedConfiguration = loadedConfig
-                    _state.value = _state.value.copy(
-                        configuration = loadedConfig,
-                        isModified = false
-                    )
-                    
-                    println("DEBUG LOAD: Configuration loaded successfully")
-                    println("DEBUG LOAD: Left menu order: ${leftMenu.map { it?.label }}")
-                    println("DEBUG LOAD: Right menu order: ${rightMenu.map { it?.label }}")
-                } else {
-                    println("DEBUG LOAD: No saved configuration found - using default")
-                    initializeDefaultConfiguration()
-                }
-            } catch (e: Exception) {
-                println("DEBUG LOAD: Error loading configuration - ${e.message}")
-                initializeDefaultConfiguration()
-            }
+        // If we already have saved configuration in memory, use it
+        if (savedConfiguration != null) {
+            println("DEBUG LOAD: Found saved configuration in memory")
+            _state.value = _state.value.copy(
+                configuration = savedConfiguration!!,
+                isModified = false
+            )
+            println("DEBUG LOAD: Left menu order: ${savedConfiguration!!.leftSideMenu.map { it?.label }}")
+            println("DEBUG LOAD: Right menu order: ${savedConfiguration!!.rightSideMenu.map { it?.label }}")
+        } else {
+            // No saved config, use default
+            println("DEBUG LOAD: No saved configuration - using default")
+            initializeDefaultConfiguration()
         }
     }
     
@@ -474,48 +433,6 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
         }
         
         return config.copy(middleTray = updatedMiddleTray)
-    }
-    
-    private fun serializeIconList(icons: List<IconItem?>): String {
-        val jsonArray = JSONArray()
-        icons.forEach { icon ->
-            if (icon != null) {
-                val jsonObject = JSONObject().apply {
-                    put("id", icon.id)
-                    put("label", icon.label)
-                    put("iconRes", icon.iconRes)
-                    put("isProtected", icon.isProtected)
-                    put("isEnabled", icon.isEnabled)
-                }
-                jsonArray.put(jsonObject)
-            } else {
-                jsonArray.put(JSONObject.NULL)
-            }
-        }
-        return jsonArray.toString()
-    }
-    
-    private fun deserializeIconList(json: String): List<IconItem?> {
-        val jsonArray = JSONArray(json)
-        val icons = mutableListOf<IconItem?>()
-        
-        for (i in 0 until jsonArray.length()) {
-            if (jsonArray.isNull(i)) {
-                icons.add(null)
-            } else {
-                val jsonObject = jsonArray.getJSONObject(i)
-                val icon = IconItem(
-                    id = jsonObject.getString("id"),
-                    label = jsonObject.getString("label"),
-                    iconRes = jsonObject.getInt("iconRes"),
-                    isProtected = jsonObject.getBoolean("isProtected"),
-                    isEnabled = jsonObject.getBoolean("isEnabled")
-                )
-                icons.add(icon)
-            }
-        }
-        
-        return icons
     }
     
     private fun createDefaultConfiguration(): LauncherConfiguration {

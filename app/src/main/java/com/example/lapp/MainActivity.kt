@@ -62,12 +62,19 @@ class MainActivity : AppCompatActivity() {
         setupButtons()
         observeViewModel()
         
-        viewModel.initializeDefaultConfiguration()
+        // No need to initialize - HomeActivity handles it
+        println("DEBUG MAIN: MainActivity opened for customization")
+        println("DEBUG MAIN: Current left menu: ${repository.state.value.configuration.leftSideMenu.map { it?.label }}")
+        println("DEBUG MAIN: Current right menu: ${repository.state.value.configuration.rightSideMenu.map { it?.label }}")
     }
 
     private fun initializeRepository() {
-        repository = LauncherRepositoryImpl(this)
+        // Get singleton instance of repository
+        repository = LauncherRepositoryImpl.getInstance(this)
         viewModel = LauncherViewModel(repository)
+        
+        println("DEBUG INIT: Repository singleton obtained")
+        println("DEBUG INIT: Current state isModified=${repository.state.value.isModified}")
     }
 
     private fun initializeViews() {
@@ -774,7 +781,8 @@ class MainActivity : AppCompatActivity() {
             viewModel.saveConfiguration()
             
             android.widget.Toast.makeText(this, "Configuration saved!", android.widget.Toast.LENGTH_SHORT).show()
-            println("DEBUG BUTTON: Configuration saved - app remains open")
+            println("DEBUG BUTTON: Configuration saved - returning to home")
+            finish()  // Go back to HomeActivity
         }
         
         cancelButton.setOnClickListener {
@@ -782,8 +790,15 @@ class MainActivity : AppCompatActivity() {
             viewModel.resetToDefault()
             
             android.widget.Toast.makeText(this, "Changes discarded", android.widget.Toast.LENGTH_SHORT).show()
-            println("DEBUG BUTTON: Changes discarded - app remains open")
+            println("DEBUG BUTTON: Changes discarded - returning to home")
+            finish()  // Go back to HomeActivity
         }
+    }
+    
+    override fun onBackPressed() {
+        println("DEBUG MAIN: Back button pressed - discarding changes")
+        viewModel.resetToDefault()
+        super.onBackPressed()
     }
 
     private fun observeViewModel() {
