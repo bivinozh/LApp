@@ -223,6 +223,139 @@ class MainActivity : AppCompatActivity() {
         leftItemTouchHelper.attachToRecyclerView(leftSideMenuRecyclerView)
         println("DEBUG SETUP: Left ItemTouchHelper attached to RecyclerView")
 
+        // ItemTouchHelper for middle tray internal drag and drop
+        val middleTrayItemTouchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN or ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT, 0
+        ) {
+            override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
+                super.onSelectedChanged(viewHolder, actionState)
+                when (actionState) {
+                    ItemTouchHelper.ACTION_STATE_DRAG -> {
+                        println("DEBUG MIDDLE: Drag started at position ${viewHolder?.bindingAdapterPosition}")
+                    }
+                    ItemTouchHelper.ACTION_STATE_IDLE -> {
+                        println("DEBUG MIDDLE: Drag ended")
+                    }
+                }
+            }
+            
+            override fun getMovementFlags(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder
+            ): Int {
+                val position = viewHolder.bindingAdapterPosition
+                if (position == RecyclerView.NO_POSITION) return 0
+                
+                val icon = middleTrayAdapter.getCurrentList().getOrNull(position)
+                
+                println("DEBUG MIDDLE: getMovementFlags for position $position, icon=${icon?.label}, enabled=${icon?.isEnabled}")
+                
+                // Only allow dragging enabled icons (disabled ones are in side menus)
+                if (icon?.isEnabled == false) {
+                    println("DEBUG MIDDLE: 🔒 BLOCKED - ${icon.label} is disabled")
+                    return 0
+                }
+                
+                // Block protected icons
+                if (icon?.isProtected == true) {
+                    println("DEBUG MIDDLE: 🔒 BLOCKED - ${icon.label} is protected")
+                    return 0
+                }
+                
+                // Allow dragging enabled icons in all directions
+                return if (icon != null && icon.isEnabled) {
+                    println("DEBUG MIDDLE: ✅ Allowing drag for ${icon.label}")
+                    makeMovementFlags(ItemTouchHelper.UP or ItemTouchHelper.DOWN or ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT, 0)
+                } else {
+                    0
+                }
+            }
+            
+            override fun canDropOver(
+                recyclerView: RecyclerView,
+                current: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val targetPosition = target.bindingAdapterPosition
+                if (targetPosition == RecyclerView.NO_POSITION) return false
+                
+                val targetIcon = middleTrayAdapter.getCurrentList().getOrNull(targetPosition)
+                
+                // BLOCK dropping on disabled icons (they're in side menus)
+                if (targetIcon?.isEnabled == false) {
+                    println("DEBUG MIDDLE: 🔒 BLOCKED - Cannot drop on disabled icon '${targetIcon.label}'")
+                    return false
+                }
+                
+                // BLOCK dropping on protected icons
+                if (targetIcon?.isProtected == true) {
+                    println("DEBUG MIDDLE: 🔒 BLOCKED - Cannot drop on protected icon '${targetIcon.label}'")
+                    return false
+                }
+                
+                val canDrop = targetIcon == null || targetIcon.isEnabled
+                println("DEBUG MIDDLE: canDropOver to position $targetPosition, targetIcon=${targetIcon?.label}, canDrop=$canDrop")
+                return canDrop
+            }
+            
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val fromPosition = viewHolder.bindingAdapterPosition
+                val toPosition = target.bindingAdapterPosition
+                
+                println("DEBUG MIDDLE: onMove from $fromPosition to $toPosition")
+                
+                if (fromPosition == RecyclerView.NO_POSITION || toPosition == RecyclerView.NO_POSITION) {
+                    println("DEBUG MIDDLE: Invalid positions")
+                    return false
+                }
+                
+                // Check if either position has a disabled or protected icon
+                val fromIcon = middleTrayAdapter.getCurrentList().getOrNull(fromPosition)
+                val toIcon = middleTrayAdapter.getCurrentList().getOrNull(toPosition)
+                
+                if (fromIcon?.isEnabled == false) {
+                    println("DEBUG MIDDLE: 🔒 BLOCKED - Cannot move from position $fromPosition - disabled")
+                    return false
+                }
+                if (fromIcon?.isProtected == true) {
+                    println("DEBUG MIDDLE: 🔒 BLOCKED - Cannot move from position $fromPosition - protected")
+                    return false
+                }
+                if (toIcon?.isEnabled == false) {
+                    println("DEBUG MIDDLE: 🔒 BLOCKED - Cannot move to position $toPosition - disabled")
+                    return false
+                }
+                if (toIcon?.isProtected == true) {
+                    println("DEBUG MIDDLE: 🔒 BLOCKED - Cannot move to position $toPosition - protected")
+                    return false
+                }
+                
+                // Swap items in adapter immediately for smooth animation
+                middleTrayAdapter.swapItemsImmediately(fromPosition, toPosition)
+                println("DEBUG MIDDLE: Swapped in adapter")
+                
+                // Update ViewModel state
+                viewModel.swapIcons(DragSource.MIDDLE_TRAY, fromPosition, DragTarget.MIDDLE_TRAY, toPosition)
+                println("DEBUG MIDDLE: Updated ViewModel")
+                return true
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                // Not used
+            }
+
+            override fun isLongPressDragEnabled(): Boolean {
+                println("DEBUG MIDDLE: isLongPressDragEnabled called - returning false (using View drag system)")
+                return false
+            }
+        })
+        middleTrayItemTouchHelper.attachToRecyclerView(middleTrayRecyclerView)
+        println("DEBUG SETUP: Middle tray ItemTouchHelper attached to RecyclerView")
+
         // ItemTouchHelper for right side menu internal drag and drop
         val rightItemTouchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0
@@ -393,9 +526,9 @@ class MainActivity : AppCompatActivity() {
         println("DEBUG DRAG: ========== START DRAG FROM MIDDLE TRAY ==========")
         println("DEBUG DRAG: Position = $position")
         
-        val state = viewModel.state.value
-        val icon = state.configuration.middleTray[position]
-        println("DEBUG DRAG: Icon at position $position = '${icon?.label}', enabled=${icon?.isEnabled}, protected=${icon?.isProtected}")
+        // Get icon from adapter for most up-to-date data
+        val icon = middleTrayAdapter.getCurrentItem(position)
+        println("DEBUG DRAG: Icon from Adapter at position $position = '${icon?.label}', enabled=${icon?.isEnabled}, protected=${icon?.isProtected}")
         
         if (icon != null && !icon.isEnabled) {
             println("DEBUG DRAG: 🔒 BLOCKED - Icon '${icon.label}' is disabled (exists in side tray)")
@@ -409,6 +542,7 @@ class MainActivity : AppCompatActivity() {
         
         if (icon != null && icon.isEnabled) {
             println("DEBUG DRAG: ✅ Starting drag for '${icon.label}'")
+            println("DEBUG DRAG: Icon data - id=${icon.id}, label=${icon.label}, iconRes=${icon.iconRes}")
             startDrag(icon, DragSource.MIDDLE_TRAY, position)
         } else {
             println("DEBUG DRAG: ❌ Cannot drag - icon is null")
@@ -534,23 +668,26 @@ class MainActivity : AppCompatActivity() {
         
         // Check if it's an internal swap (same container, different position)
         val isInternalSwap = when {
+            fromSource == DragSource.MIDDLE_TRAY && toTarget == DragTarget.MIDDLE_TRAY -> true
             fromSource == DragSource.LEFT_SIDE_MENU && toTarget == DragTarget.LEFT_SIDE_MENU -> true
             fromSource == DragSource.RIGHT_SIDE_MENU && toTarget == DragTarget.RIGHT_SIDE_MENU -> true
             else -> false
         }
         
         if (isInternalSwap) {
-            println("DEBUG DROP: Internal swap detected - performing immediate swap")
+            println("DEBUG DROP: Internal swap detected in $fromSource - performing immediate swap")
             
             // Step 1: Swap in adapter IMMEDIATELY for instant visual update
             when (fromSource) {
+                DragSource.MIDDLE_TRAY -> {
+                    middleTrayAdapter.swapItemsImmediately(fromIndex, toIndex)
+                }
                 DragSource.LEFT_SIDE_MENU -> {
                     leftSideMenuAdapter.swapItemsImmediately(fromIndex, toIndex)
                 }
                 DragSource.RIGHT_SIDE_MENU -> {
                     rightSideMenuAdapter.swapItemsImmediately(fromIndex, toIndex)
                 }
-                else -> {}
             }
             
             // Step 2: Update ViewModel state (will sync back to adapter via observer)
