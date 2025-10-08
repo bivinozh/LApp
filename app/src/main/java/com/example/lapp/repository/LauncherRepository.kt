@@ -60,6 +60,8 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
     }
     
     override fun moveIcon(fromSource: DragSource, fromIndex: Int, toTarget: DragTarget, toIndex: Int) {
+        println("DEBUG REPO: moveIcon called - from $fromSource[$fromIndex] to $toTarget[$toIndex]")
+        
         val currentState = _state.value
         val config = currentState.configuration
         
@@ -69,7 +71,26 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
             DragSource.RIGHT_SIDE_MENU -> config.rightSideMenu[fromIndex]
         }
         
-        if (icon == null || icon.isProtected) return
+        // Get the target icon to check if it's protected
+        val targetIcon = when (toTarget) {
+            DragTarget.MIDDLE_TRAY -> config.middleTray[toIndex]
+            DragTarget.LEFT_SIDE_MENU -> config.leftSideMenu[toIndex]
+            DragTarget.RIGHT_SIDE_MENU -> config.rightSideMenu[toIndex]
+        }
+        
+        println("DEBUG REPO: Source icon='${icon?.label}' (protected=${icon?.isProtected})")
+        println("DEBUG REPO: Target icon='${targetIcon?.label}' (protected=${targetIcon?.isProtected})")
+        
+        if (icon == null || icon.isProtected) {
+            println("DEBUG REPO: 🔒 BLOCKED - Source icon is null or protected")
+            return
+        }
+        
+        // BLOCK if target has a protected icon
+        if (targetIcon?.isProtected == true) {
+            println("DEBUG REPO: 🔒 BLOCKED - Cannot replace protected icon '${targetIcon.label}' at target position")
+            return
+        }
         
         // Handle special case: moving from side launcher to middle tray
         if ((fromSource == DragSource.LEFT_SIDE_MENU || fromSource == DragSource.RIGHT_SIDE_MENU) && toTarget == DragTarget.MIDDLE_TRAY) {
@@ -193,7 +214,7 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
         toIndex: Int,
         draggedIcon: IconItem
     ) {
-        println("DEBUG REPO: handleMiddleTrayToSideLauncherMove - disabling '${draggedIcon.label}' in middle tray")
+        println("DEBUG REPO: handleMiddleTrayToSideLauncherMove - moving '${draggedIcon.label}' to side menu")
         
         val currentState = _state.value
         
@@ -204,7 +225,13 @@ class LauncherRepositoryImpl(private val context: Context) : LauncherRepository 
             else -> null
         }
         
-        println("DEBUG REPO: Replaced icon in side menu = '${replacedIcon?.label}'")
+        println("DEBUG REPO: Target icon in side menu = '${replacedIcon?.label}' (protected=${replacedIcon?.isProtected})")
+        
+        // BLOCK if target position has a protected icon
+        if (replacedIcon?.isProtected == true) {
+            println("DEBUG REPO: 🔒 BLOCKED - Cannot replace protected icon '${replacedIcon.label}' in side menu")
+            return
+        }
         
         // Disable the middle tray icon (keep it there but make it non-draggable)
         val newMiddleTray = config.middleTray.toMutableList()

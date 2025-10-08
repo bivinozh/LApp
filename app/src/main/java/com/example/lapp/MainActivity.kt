@@ -493,7 +493,19 @@ class MainActivity : AppCompatActivity() {
                     
                     val position = getDropPosition(recyclerView, dragEvent)
                     if (position != -1 && draggedIcon != null && dragSource != null) {
-                        handleDrop(dragSource!!, dragSourceIndex, target, position)
+                        // Check if target position has a protected icon
+                        val targetIcon = when (target) {
+                            DragTarget.MIDDLE_TRAY -> middleTrayAdapter.getCurrentItem(position)
+                            DragTarget.LEFT_SIDE_MENU -> leftSideMenuAdapter.getCurrentItem(position)
+                            DragTarget.RIGHT_SIDE_MENU -> rightSideMenuAdapter.getCurrentItem(position)
+                        }
+                        
+                        if (targetIcon?.isProtected == true) {
+                            println("DEBUG DROP LISTENER: 🔒 BLOCKED - Cannot drop on protected icon '${targetIcon.label}' at position $position")
+                            android.widget.Toast.makeText(view.context, "Cannot replace protected icon", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            handleDrop(dragSource!!, dragSourceIndex, target, position)
+                        }
                     }
                     true
                 }
@@ -650,6 +662,18 @@ class MainActivity : AppCompatActivity() {
         val draggedIcon = this.draggedIcon
         if (draggedIcon != null && draggedIcon.isProtected) {
             println("DEBUG DROP: 🔒 BLOCKED - Dragged icon '${draggedIcon.label}' is protected (this should not happen!)")
+            return
+        }
+        
+        // Check if the target position has a protected icon (CRITICAL CHECK!)
+        val targetIcon = when (toTarget) {
+            DragTarget.MIDDLE_TRAY -> middleTrayAdapter.getCurrentItem(toIndex)
+            DragTarget.LEFT_SIDE_MENU -> leftSideMenuAdapter.getCurrentItem(toIndex)
+            DragTarget.RIGHT_SIDE_MENU -> rightSideMenuAdapter.getCurrentItem(toIndex)
+        }
+        
+        if (targetIcon?.isProtected == true) {
+            println("DEBUG DROP: 🔒 BLOCKED - Cannot drop on protected icon '${targetIcon.label}' at $toTarget[$toIndex]")
             return
         }
         
