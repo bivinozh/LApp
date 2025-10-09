@@ -29,8 +29,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var viewModel: LauncherViewModel
 
     private lateinit var middleTrayRecyclerView: RecyclerView
+    private lateinit var middleTrayContainer: android.widget.FrameLayout
     private lateinit var leftSideMenuRecyclerView: RecyclerView
     private lateinit var rightSideMenuRecyclerView: RecyclerView
+    private lateinit var rootLayout: androidx.constraintlayout.widget.ConstraintLayout
 
     private lateinit var middleTrayAdapter: MiddleTrayAdapter
     private lateinit var leftSideMenuAdapter: SideMenuAdapter
@@ -78,7 +80,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initializeViews() {
+        rootLayout = findViewById(R.id.main)
         middleTrayRecyclerView = findViewById(R.id.rv_middle_tray)
+        middleTrayContainer = findViewById(R.id.middle_tray_container)
         leftSideMenuRecyclerView = findViewById(R.id.rv_left_side_menu)
         rightSideMenuRecyclerView = findViewById(R.id.rv_right_side_menu)
         dragOverlay = findViewById(R.id.tv_drag_overlay)
@@ -343,16 +347,85 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupDragAndDrop() {
+        // Set up root layout drag listener first (catch-all for drops outside specific areas)
+        setupRootDragListener(rootLayout)
+        
         // Set up drag listeners for all RecyclerViews
         setupDragListener(middleTrayRecyclerView, DragTarget.MIDDLE_TRAY)
         setupDragListener(leftSideMenuRecyclerView, DragTarget.LEFT_SIDE_MENU)
         setupDragListener(rightSideMenuRecyclerView, DragTarget.RIGHT_SIDE_MENU)
+        
+        // Set up drag listener for middle tray container (catches drops in empty areas)
+        setupContainerDragListener(middleTrayContainer)
         
         // Set up drag listeners for buttons to treat drops as middle tray drops
         setupButtonDragListener(okButton)
         setupButtonDragListener(cancelButton)
     }
 
+    private fun setupRootDragListener(layout: androidx.constraintlayout.widget.ConstraintLayout) {
+        layout.setOnDragListener { view, dragEvent ->
+            when (dragEvent.action) {
+                DragEvent.ACTION_DRAG_STARTED -> {
+                    true
+                }
+                DragEvent.ACTION_DROP -> {
+                    // Catch-all for drops outside RecyclerViews
+                    // Only accept drops from side trays (not from middle tray itself)
+                    if (dragSource == DragSource.LEFT_SIDE_MENU || dragSource == DragSource.RIGHT_SIDE_MENU) {
+                        if (draggedIcon != null && dragSource != null) {
+                            // Find matching icon position in middle tray
+                            val state = viewModel.state.value
+                            val availablePosition = state.configuration.middleTray.indexOfFirst { it?.id == draggedIcon?.id }
+                            
+                            if (availablePosition != -1) {
+                                println("DEBUG ROOT DROP: Dropping '${draggedIcon?.label}' from $dragSource to middle tray position $availablePosition")
+                                handleDrop(dragSource!!, dragSourceIndex, DragTarget.MIDDLE_TRAY, availablePosition)
+                            } else {
+                                println("DEBUG ROOT DROP: No matching icon found in middle tray for '${draggedIcon?.label}'")
+                            }
+                        }
+                    } else {
+                        println("DEBUG ROOT DROP: Ignored - source is not a side tray")
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+    
+    private fun setupContainerDragListener(container: android.widget.FrameLayout) {
+        container.setOnDragListener { view, dragEvent ->
+            when (dragEvent.action) {
+                DragEvent.ACTION_DRAG_STARTED -> {
+                    true
+                }
+                DragEvent.ACTION_DROP -> {
+                    // Only accept drops from side trays (not from middle tray itself)
+                    if (dragSource == DragSource.LEFT_SIDE_MENU || dragSource == DragSource.RIGHT_SIDE_MENU) {
+                        if (draggedIcon != null && dragSource != null) {
+                            // Find matching icon position in middle tray
+                            val state = viewModel.state.value
+                            val availablePosition = state.configuration.middleTray.indexOfFirst { it?.id == draggedIcon?.id }
+                            
+                            if (availablePosition != -1) {
+                                println("DEBUG CONTAINER DROP: Dropping '${draggedIcon?.label}' from $dragSource to middle tray position $availablePosition")
+                                handleDrop(dragSource!!, dragSourceIndex, DragTarget.MIDDLE_TRAY, availablePosition)
+                            } else {
+                                println("DEBUG CONTAINER DROP: No matching icon found in middle tray for '${draggedIcon?.label}'")
+                            }
+                        }
+                    } else {
+                        println("DEBUG CONTAINER DROP: Ignored - source is not a side tray")
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+    
     private fun setupButtonDragListener(button: Button) {
         button.setOnDragListener { view, dragEvent ->
             when (dragEvent.action) {
