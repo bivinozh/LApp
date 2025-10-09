@@ -347,8 +347,59 @@ class MainActivity : AppCompatActivity() {
         setupDragListener(middleTrayRecyclerView, DragTarget.MIDDLE_TRAY)
         setupDragListener(leftSideMenuRecyclerView, DragTarget.LEFT_SIDE_MENU)
         setupDragListener(rightSideMenuRecyclerView, DragTarget.RIGHT_SIDE_MENU)
+        
+        // Set up drag listeners for buttons to treat drops as middle tray drops
+        setupButtonDragListener(okButton)
+        setupButtonDragListener(cancelButton)
     }
 
+    private fun setupButtonDragListener(button: Button) {
+        button.setOnDragListener { view, dragEvent ->
+            when (dragEvent.action) {
+                DragEvent.ACTION_DRAG_STARTED -> {
+                    true
+                }
+                DragEvent.ACTION_DRAG_ENTERED -> {
+                    button.alpha = 0.7f
+                    true
+                }
+                DragEvent.ACTION_DRAG_EXITED -> {
+                    button.alpha = 1.0f
+                    true
+                }
+                DragEvent.ACTION_DROP -> {
+                    button.alpha = 1.0f
+                    dragOverlay.visibility = View.GONE
+                    
+                    // Only accept drops from side trays
+                    if (dragSource == DragSource.LEFT_SIDE_MENU || dragSource == DragSource.RIGHT_SIDE_MENU) {
+                        if (draggedIcon != null && dragSource != null) {
+                            // Find matching icon position in middle tray
+                            val state = viewModel.state.value
+                            val availablePosition = state.configuration.middleTray.indexOfFirst { it?.id == draggedIcon?.id }
+                            
+                            if (availablePosition != -1) {
+                                println("DEBUG BUTTON DROP: Dropping '${draggedIcon?.label}' from $dragSource to middle tray position $availablePosition")
+                                handleDrop(dragSource!!, dragSourceIndex, DragTarget.MIDDLE_TRAY, availablePosition)
+                            } else {
+                                println("DEBUG BUTTON DROP: No matching icon found in middle tray for '${draggedIcon?.label}'")
+                            }
+                        }
+                    } else {
+                        println("DEBUG BUTTON DROP: Ignored - source is not a side tray")
+                    }
+                    true
+                }
+                DragEvent.ACTION_DRAG_ENDED -> {
+                    button.alpha = 1.0f
+                    dragOverlay.visibility = View.GONE
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+    
     private fun setupDragListener(recyclerView: RecyclerView, target: DragTarget) {
         recyclerView.setOnDragListener { view, dragEvent ->
             when (dragEvent.action) {
@@ -368,8 +419,16 @@ class MainActivity : AppCompatActivity() {
                     view.alpha = 1.0f
                     dragOverlay.visibility = View.GONE
                     
+                    // Verify drop is within RecyclerView bounds
+                    if (!isDropWithinBounds(recyclerView, dragEvent)) {
+                        println("DEBUG DROP LISTENER: ❌ Drop outside RecyclerView bounds for $target - ignoring")
+                        return@setOnDragListener true
+                    }
+                    
                     val position = getDropPosition(recyclerView, dragEvent)
                     if (position != -1 && draggedIcon != null && dragSource != null) {
+                        println("DEBUG DROP LISTENER: Valid drop at position $position in $target")
+                        
                         // Check if target position has a protected icon
                         val targetIcon = when (target) {
                             DragTarget.MIDDLE_TRAY -> middleTrayAdapter.getCurrentItem(position)
@@ -383,6 +442,8 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             handleDrop(dragSource!!, dragSourceIndex, target, position)
                         }
+                    } else {
+                        println("DEBUG DROP LISTENER: ❌ Invalid drop - position=$position, draggedIcon=$draggedIcon, dragSource=$dragSource")
                     }
                     true
                 }
@@ -402,6 +463,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isDropWithinBounds(recyclerView: RecyclerView, dragEvent: DragEvent): Boolean {
+        val x = dragEvent.x
+        val y = dragEvent.y
+        
+        // Check if coordinates are within RecyclerView bounds
+        val isWithinBounds = x >= 0 && x <= recyclerView.width && y >= 0 && y <= recyclerView.height
+        
+        println("DEBUG DROP BOUNDS: x=$x, y=$y, RV width=${recyclerView.width}, height=${recyclerView.height}, within=$isWithinBounds")
+        
+        return isWithinBounds
+    }
+    
     private fun getDropPosition(recyclerView: RecyclerView, dragEvent: DragEvent): Int {
         val x = dragEvent.x.toInt()
         val y = dragEvent.y.toInt()
