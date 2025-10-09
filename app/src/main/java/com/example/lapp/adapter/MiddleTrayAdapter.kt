@@ -15,6 +15,7 @@ class MiddleTrayAdapter(
 ) : RecyclerView.Adapter<MiddleTrayAdapter.ViewHolder>() {
 
     private var items: List<IconItem?> = emptyList()
+    private var selectedPosition: Int = RecyclerView.NO_POSITION
 
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val iconImageView: ImageView = itemView.findViewById(R.id.iv_icon)
@@ -38,6 +39,14 @@ class MiddleTrayAdapter(
             holder.labelTextView.alpha = if (icon.isEnabled) 1.0f else 0.3f
             holder.itemView.isEnabled = icon.isEnabled && !icon.isProtected
             
+            // Apply yellow border for selected position (during drag)
+            if (position == selectedPosition) {
+                println("DEBUG MIDDLE ADAPTER: ✅ Showing YELLOW BORDER for position $position")
+                holder.itemView.setBackgroundResource(R.drawable.yellow_rounded_background)
+            } else {
+                holder.itemView.background = null
+            }
+            
             // Visual indicator for disabled state
             if (!icon.isEnabled) {
                 holder.itemView.alpha = 0.5f
@@ -48,6 +57,7 @@ class MiddleTrayAdapter(
             holder.iconImageView.setImageDrawable(null)
             holder.labelTextView.text = ""
             holder.itemView.isEnabled = false
+            holder.itemView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
 
         holder.itemView.setOnClickListener {
@@ -128,4 +138,36 @@ class MiddleTrayAdapter(
     fun getCurrentList(): List<IconItem?> = items
     
     fun getCurrentItem(position: Int): IconItem? = items.getOrNull(position)
+    
+    fun setSelectedPosition(position: Int) {
+        val previousPosition = selectedPosition
+        println("DEBUG MIDDLE ADAPTER: setSelectedPosition called - current=$previousPosition, new=$position")
+        
+        if (previousPosition == position) {
+            // Keep selection if clicking the same item (don't toggle off)
+            println("DEBUG MIDDLE ADAPTER: ✅ Same position clicked - keeping selection at $position")
+            return
+        }
+        
+        selectedPosition = position
+        
+        // Refresh previous selected item
+        if (previousPosition != RecyclerView.NO_POSITION) {
+            notifyItemChanged(previousPosition)
+            println("DEBUG MIDDLE ADAPTER: Refreshed previous position $previousPosition")
+        }
+        
+        // Refresh newly selected item
+        notifyItemChanged(selectedPosition)
+        println("DEBUG MIDDLE ADAPTER: ✅ Selected position $selectedPosition (selectedPosition variable = $selectedPosition)")
+    }
+    
+    fun clearSelection() {
+        val previousPosition = selectedPosition
+        selectedPosition = RecyclerView.NO_POSITION
+        if (previousPosition != RecyclerView.NO_POSITION) {
+            notifyItemChanged(previousPosition)
+            println("DEBUG MIDDLE ADAPTER: Cleared selection from position $previousPosition")
+        }
+    }
 }

@@ -114,9 +114,9 @@ class HomeActivity : AppCompatActivity() {
         val icon = state.configuration.middleTray[position]
         if (icon != null && icon.isEnabled) {
             // Launch the app
-            println("DEBUG HOME: Clicked on '${icon.label}' in middle tray")
+            println("DEBUG HOME: Launching app '${icon.label}'")
             android.widget.Toast.makeText(this, "Launching ${icon.label}", android.widget.Toast.LENGTH_SHORT).show()
-            // TODO: Launch actual app
+            // TODO: Launch actual app when needed
         }
     }
     
