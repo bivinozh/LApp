@@ -5,15 +5,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.lapp.R
 import com.example.lapp.model.IconItem
 
 class AvailableIconsAdapter(
     private val onItemClick: (icon: IconItem) -> Unit
-) : RecyclerView.Adapter<AvailableIconsAdapter.ViewHolder>() {
-
-    private var items: List<IconItem> = emptyList()
+) : ListAdapter<IconItem, AvailableIconsAdapter.ViewHolder>(AvailableIconsAdapter.IconDiffCallback()) {
 
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val iconImageView: ImageView = itemView.findViewById(R.id.iv_icon)
@@ -27,7 +27,7 @@ class AvailableIconsAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val icon = items[position]
+        val icon = getItem(position)
         
         holder.iconImageView.setImageResource(icon.iconRes)
         holder.labelTextView.text = icon.label
@@ -41,11 +41,14 @@ class AvailableIconsAdapter(
             }
         }
     }
+    
+    class IconDiffCallback : DiffUtil.ItemCallback<IconItem>() {
+        override fun areItemsTheSame(oldItem: IconItem, newItem: IconItem): Boolean {
+            return oldItem.id == newItem.id
+        }
 
-    override fun getItemCount(): Int = items.size
-
-    fun submitList(newItems: List<IconItem>) {
-        items = newItems
-        notifyDataSetChanged()
+        override fun areContentsTheSame(oldItem: IconItem, newItem: IconItem): Boolean {
+            return oldItem == newItem
+        }
     }
 }
