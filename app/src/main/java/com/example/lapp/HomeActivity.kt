@@ -2,31 +2,32 @@ package com.example.lapp
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
+import android.view.View
 import android.widget.Button
-import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.lapp.adapter.MiddleTrayAdapter
-import com.example.lapp.adapter.SideMenuAdapter
+import androidx.appcompat.widget.AppCompatImageView
+import com.example.lapp.model.IconItem
 import com.example.lapp.repository.LauncherRepositoryImpl
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 
 class HomeActivity : AppCompatActivity() {
 
     private lateinit var repository: LauncherRepositoryImpl
     
-    private lateinit var middleTrayRecyclerView: RecyclerView
-    private lateinit var leftSideMenuRecyclerView: RecyclerView
-    private lateinit var rightSideMenuRecyclerView: RecyclerView
-    private lateinit var customizeButton: Button
+    // Left tray icons
+    private lateinit var leftIcon1: AppCompatImageView
+    private lateinit var leftIcon2: AppCompatImageView
+    private lateinit var leftIcon3: AppCompatImageView
+    private lateinit var leftIcon4: AppCompatImageView
     
-    private lateinit var middleTrayAdapter: MiddleTrayAdapter
-    private lateinit var leftSideMenuAdapter: SideMenuAdapter
-    private lateinit var rightSideMenuAdapter: SideMenuAdapter
+    // Right tray icons
+    private lateinit var rightIcon1: AppCompatImageView
+    private lateinit var rightIcon2: AppCompatImageView
+    private lateinit var rightIcon3: AppCompatImageView
+    private lateinit var rightIcon4: AppCompatImageView
+    
+    private lateinit var customizeButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,118 +35,127 @@ class HomeActivity : AppCompatActivity() {
         
         initializeRepository()
         initializeViews()
-        setupRecyclerViews()
+        setupIconClickListeners()
         setupCustomizeButton()
-        observeRepository()
+        loadIconsFromRepository()
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        // Reload icons when returning from MainActivity
+        loadIconsFromRepository()
     }
 
     private fun initializeRepository() {
         // Get singleton instance
         repository = LauncherRepositoryImpl.getInstance(this)
-        println("DEBUG HOME: Repository singleton obtained")
         
         // Initialize default config only on first launch
         if (repository.state.value.configuration.middleTray.isEmpty()) {
-            println("DEBUG HOME: Initializing default configuration")
             repository.initializeDefaultConfiguration()
-        } else {
-            println("DEBUG HOME: Using existing configuration from repository")
         }
     }
 
     private fun initializeViews() {
-        middleTrayRecyclerView = findViewById(R.id.rv_middle_tray)
-        leftSideMenuRecyclerView = findViewById(R.id.rv_left_side_menu)
-        rightSideMenuRecyclerView = findViewById(R.id.rv_right_side_menu)
+        // Left tray icons
+        leftIcon1 = findViewById(R.id.img_left_icon1)
+        leftIcon2 = findViewById(R.id.img_left_icon2)
+        leftIcon3 = findViewById(R.id.img_left_icon3)
+        leftIcon4 = findViewById(R.id.img_left_icon4)
+        
+        // Right tray icons
+        rightIcon1 = findViewById(R.id.img_right_icon1)
+        rightIcon2 = findViewById(R.id.img_right_icon2)
+        rightIcon3 = findViewById(R.id.img_right_icon3)
+        rightIcon4 = findViewById(R.id.img_right_icon4)
+        
         customizeButton = findViewById(R.id.btn_customize)
     }
 
-    private fun setupRecyclerViews() {
-        // Middle Tray (5x2 Grid) - Display only, no interaction
-        middleTrayAdapter = MiddleTrayAdapter(
-            onItemClick = { position -> handleMiddleTrayClick(position) },
-            onItemLongClick = { position -> /* No long click on home screen */ }
-        )
-        middleTrayRecyclerView.layoutManager = GridLayoutManager(this, 5)
-        middleTrayRecyclerView.adapter = middleTrayAdapter
-
-        // Left Side Menu - Display only
-        leftSideMenuAdapter = SideMenuAdapter(
-            onItemClick = { position -> handleLeftSideMenuClick(position) },
-            onItemLongClick = { position -> /* No long click on home screen */ }
-        )
-        leftSideMenuRecyclerView.layoutManager = LinearLayoutManager(this)
-        leftSideMenuRecyclerView.adapter = leftSideMenuAdapter
-
-        // Right Side Menu - Display only
-        rightSideMenuAdapter = SideMenuAdapter(
-            onItemClick = { position -> handleRightSideMenuClick(position) },
-            onItemLongClick = { position -> /* No long click on home screen */ }
-        )
-        rightSideMenuRecyclerView.layoutManager = LinearLayoutManager(this)
-        rightSideMenuRecyclerView.adapter = rightSideMenuAdapter
+    private fun setupIconClickListeners() {
+        // Left tray icons
+        leftIcon1.setOnClickListener {
+            handleIconClick(repository.state.value.configuration.leftSideMenu.getOrNull(0))
+        }
+        
+        leftIcon2.setOnClickListener {
+            handleIconClick(repository.state.value.configuration.leftSideMenu.getOrNull(1))
+        }
+        
+        leftIcon3.setOnClickListener {
+            handleIconClick(repository.state.value.configuration.leftSideMenu.getOrNull(2))
+        }
+        
+        leftIcon4.setOnClickListener {
+            handleIconClick(repository.state.value.configuration.leftSideMenu.getOrNull(3))
+        }
+        
+        // Right tray icons
+        rightIcon1.setOnClickListener {
+            handleIconClick(repository.state.value.configuration.rightSideMenu.getOrNull(0))
+        }
+        
+        rightIcon2.setOnClickListener {
+            handleIconClick(repository.state.value.configuration.rightSideMenu.getOrNull(1))
+        }
+        
+        rightIcon3.setOnClickListener {
+            handleIconClick(repository.state.value.configuration.rightSideMenu.getOrNull(2))
+        }
+        
+        rightIcon4.setOnClickListener {
+            handleIconClick(repository.state.value.configuration.rightSideMenu.getOrNull(3))
+        }
+    }
+    
+    private fun handleIconClick(iconItem: IconItem?) {
+        if (iconItem != null && iconItem.isEnabled) {
+            Log.d("HomeActivity", "Icon clicked - Label: ${iconItem.label}, ID: ${iconItem.id}")
+            println("DEBUG HOME: Icon clicked - Label: ${iconItem.label}")
+            Toast.makeText(this, "Launching ${iconItem.label}", Toast.LENGTH_SHORT).show()
+            // TODO: Launch actual app
+        } else if (iconItem != null && !iconItem.isEnabled) {
+            Log.d("HomeActivity", "Disabled icon clicked - Label: ${iconItem.label}")
+            println("DEBUG HOME: Disabled icon clicked - Label: ${iconItem.label}")
+        } else {
+            Log.d("HomeActivity", "Empty icon slot clicked")
+            println("DEBUG HOME: Empty icon slot clicked")
+        }
     }
 
     private fun setupCustomizeButton() {
         customizeButton.setOnClickListener {
-            println("DEBUG HOME: Customize button clicked - navigating to MainActivity")
             val intent = Intent(this, MainActivity::class.java)
             startActivity(intent)
         }
     }
-
-    private fun observeRepository() {
-        lifecycleScope.launch {
-            repository.state.collectLatest { state ->
-                println("DEBUG HOME: Repository state updated")
-                println("DEBUG HOME: Left menu: ${state.configuration.leftSideMenu.map { it?.label }}")
-                println("DEBUG HOME: Right menu: ${state.configuration.rightSideMenu.map { it?.label }}")
-                
-                // Update adapters to show current configuration
-                middleTrayAdapter.submitList(state.configuration.middleTray)
-                leftSideMenuAdapter.submitList(state.configuration.leftSideMenu)
-                rightSideMenuAdapter.submitList(state.configuration.rightSideMenu)
-            }
-        }
-    }
     
-    private fun handleMiddleTrayClick(position: Int) {
+    private fun loadIconsFromRepository() {
         val state = repository.state.value
-        val icon = state.configuration.middleTray[position]
-        if (icon != null && icon.isEnabled) {
-            // Launch the app
-            println("DEBUG HOME: Launching app '${icon.label}'")
-            android.widget.Toast.makeText(this, "Launching ${icon.label}", android.widget.Toast.LENGTH_SHORT).show()
-            // TODO: Launch actual app when needed
-        }
+        val leftMenu = state.configuration.leftSideMenu
+        val rightMenu = state.configuration.rightSideMenu
+        
+        // Update left tray icons (4 icons)
+        updateIcon(leftIcon1, leftMenu.getOrNull(0))
+        updateIcon(leftIcon2, leftMenu.getOrNull(1))
+        updateIcon(leftIcon3, leftMenu.getOrNull(2))
+        updateIcon(leftIcon4, leftMenu.getOrNull(3))
+        
+        // Update right tray icons (4 icons)
+        updateIcon(rightIcon1, rightMenu.getOrNull(0))
+        updateIcon(rightIcon2, rightMenu.getOrNull(1))
+        updateIcon(rightIcon3, rightMenu.getOrNull(2))
+        updateIcon(rightIcon4, rightMenu.getOrNull(3))
     }
     
-    private fun handleLeftSideMenuClick(position: Int) {
-        val state = repository.state.value
-        val icon = state.configuration.leftSideMenu[position]
-        if (icon != null && icon.isEnabled) {
-            // Launch the app
-            println("DEBUG HOME: Clicked on '${icon.label}' in left menu")
-            android.widget.Toast.makeText(this, "Launching ${icon.label}", android.widget.Toast.LENGTH_SHORT).show()
-            // TODO: Launch actual app
+    private fun updateIcon(imageView: AppCompatImageView, iconItem: IconItem?) {
+        if (iconItem != null) {
+            imageView.setImageResource(iconItem.iconRes)
+            imageView.visibility = View.VISIBLE
+            imageView.alpha = if (iconItem.isEnabled) 1.0f else 0.4f
+        } else {
+            imageView.visibility = View.INVISIBLE
         }
-    }
-    
-    private fun handleRightSideMenuClick(position: Int) {
-        val state = repository.state.value
-        val icon = state.configuration.rightSideMenu[position]
-        if (icon != null && icon.isEnabled) {
-            // Launch the app
-            println("DEBUG HOME: Clicked on '${icon.label}' in right menu")
-            android.widget.Toast.makeText(this, "Launching ${icon.label}", android.widget.Toast.LENGTH_SHORT).show()
-            // TODO: Launch actual app
-        }
-    }
-    
-    override fun onResume() {
-        super.onResume()
-        println("DEBUG HOME: onResume - checking for configuration updates")
-        // The state observer will automatically update the UI if configuration changed
     }
 }
 

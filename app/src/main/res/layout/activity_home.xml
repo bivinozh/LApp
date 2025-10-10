@@ -22,47 +22,171 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="32dp" />
 
-    <!-- Left Side Menu -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_left_side_menu"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="32dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="80dp"
+    <!-- Vertical Guidelines -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_left_edge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.2" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_right_edge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.8" />
+
+    <!-- Horizontal Guidelines for 4 rows with better spacing -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_row1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.25" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_row2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.40" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_row3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.55" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline_row4"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.70" />
+
+    <!-- Left Tray Icons -->
+    <!-- Icon 1 - Left Row 1 -->
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/img_left_icon1"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_margin="8dp"
+        android:src="@android:drawable/ic_menu_call"
+        android:background="#5B9BD5"
+        android:scaleType="centerInside"
+        android:padding="16dp"
         app:layout_constraintTop_toBottomOf="@id/tv_home_header"
+        app:layout_constraintBottom_toTopOf="@id/guideline_row1"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/rv_middle_tray"
-        app:layout_constraintBottom_toTopOf="@id/btn_customize" />
+        app:layout_constraintEnd_toStartOf="@id/guideline_left_edge" />
 
-    <!-- Middle Tray -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_middle_tray"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="32dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="80dp"
-        app:layout_constraintTop_toBottomOf="@id/tv_home_header"
-        app:layout_constraintStart_toEndOf="@id/rv_left_side_menu"
-        app:layout_constraintEnd_toStartOf="@id/rv_right_side_menu"
-        app:layout_constraintBottom_toTopOf="@id/btn_customize" />
+    <!-- Icon 2 - Left Row 2 -->
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/img_left_icon2"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_margin="8dp"
+        android:src="@android:drawable/ic_menu_camera"
+        android:background="#5B9BD5"
+        android:scaleType="centerInside"
+        android:padding="16dp"
+        app:layout_constraintTop_toTopOf="@id/guideline_row1"
+        app:layout_constraintBottom_toTopOf="@id/guideline_row2"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/guideline_left_edge" />
 
-    <!-- Right Side Menu -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_right_side_menu"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="32dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="80dp"
+    <!-- Icon 3 - Left Row 3 -->
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/img_left_icon3"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_margin="8dp"
+        android:src="@android:drawable/ic_menu_gallery"
+        android:background="#5B9BD5"
+        android:scaleType="centerInside"
+        android:padding="16dp"
+        app:layout_constraintTop_toTopOf="@id/guideline_row2"
+        app:layout_constraintBottom_toTopOf="@id/guideline_row3"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/guideline_left_edge" />
+
+    <!-- Icon 4 - Left Row 4 -->
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/img_left_icon4"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_margin="8dp"
+        android:src="@android:drawable/ic_menu_search"
+        android:background="#5B9BD5"
+        android:scaleType="centerInside"
+        android:padding="16dp"
+        app:layout_constraintTop_toTopOf="@id/guideline_row3"
+        app:layout_constraintBottom_toTopOf="@id/guideline_row4"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/guideline_left_edge" />
+
+    <!-- Right Tray Icons -->
+    <!-- Icon 5 - Right Row 1 -->
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/img_right_icon1"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_margin="8dp"
+        android:src="@android:drawable/ic_menu_edit"
+        android:background="#5B9BD5"
+        android:scaleType="centerInside"
+        android:padding="16dp"
         app:layout_constraintTop_toBottomOf="@id/tv_home_header"
-        app:layout_constraintStart_toEndOf="@id/rv_middle_tray"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/btn_customize" />
+        app:layout_constraintBottom_toTopOf="@id/guideline_row1"
+        app:layout_constraintStart_toEndOf="@id/guideline_right_edge"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Icon 6 - Right Row 2 -->
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/img_right_icon2"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_margin="8dp"
+        android:src="@android:drawable/ic_menu_preferences"
+        android:background="#5B9BD5"
+        android:scaleType="centerInside"
+        android:padding="16dp"
+        app:layout_constraintTop_toTopOf="@id/guideline_row1"
+        app:layout_constraintBottom_toTopOf="@id/guideline_row2"
+        app:layout_constraintStart_toEndOf="@id/guideline_right_edge"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Icon 7 - Right Row 3 -->
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/img_right_icon3"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_margin="8dp"
+        android:src="@android:drawable/ic_menu_my_calendar"
+        android:background="#5B9BD5"
+        android:scaleType="centerInside"
+        android:padding="16dp"
+        app:layout_constraintTop_toTopOf="@id/guideline_row2"
+        app:layout_constraintBottom_toTopOf="@id/guideline_row3"
+        app:layout_constraintStart_toEndOf="@id/guideline_right_edge"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Icon 8 - Right Row 4 -->
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/img_right_icon4"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_margin="8dp"
+        android:src="@android:drawable/ic_menu_recent_history"
+        android:background="#5B9BD5"
+        android:scaleType="centerInside"
+        android:padding="16dp"
+        app:layout_constraintTop_toTopOf="@id/guideline_row3"
+        app:layout_constraintBottom_toTopOf="@id/guideline_row4"
+        app:layout_constraintStart_toEndOf="@id/guideline_right_edge"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Customize Button -->
     <Button
